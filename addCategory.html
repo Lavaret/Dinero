@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <title>Dodaj nową kategorię</title>
+  <link rel="stylesheet" href="assets/styles/formStyle.css">
+  <link rel="stylesheet" href="assets/styles/custom.css">
+</head>
+<body>
+  <div class="container gray_background form_container">
+    <form>
+      <div class="row">
+          <input type="text" name="name" id="category_name" placeholder="Nazwa kategorii" required="required">
+      </div>
+      <div class="row">
+          <button type="submit" id="add_category">Zapisz</button>
+      </div>
+    </form>
+    <div class="message-danger message"></div>
+  </div>
+  <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+  <script>
+    let $ = window.$ = require('jquery');
+
+    //sending data to main.js constants
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+
+    //submit form event listener
+    document.querySelector('form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      let name = $('#category_name').val()
+      setData(name);
+    });
+
+    //database connection
+    function setData(category) {
+      //create database connection
+      var request = window.indexedDB.open("DatabaseForCategory", 3);
+
+      // Create the schema
+      request.onupgradeneeded = function() {
+          var db = request.result;
+          var store = db.createObjectStore("CategoryStore", {autoIncrement: true});
+          var index = store.createIndex("category", "category");
+      };
+
+      //main operation
+      request.onsuccess = function() {
+          // Start a new transaction
+          var db = request.result;
+          var tx = db.transaction("CategoryStore", "readwrite");
+          var store = tx.objectStore("CategoryStore");
+
+          // Add data to the database
+          store.openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor) {
+              if(cursor.value == category) {
+                addErrorMessage();
+                return;
+              } 
+              cursor.continue(); 
+            } else {
+              store.put(category);
+              //send closing window request
+              ipcRenderer.send('submitForm', true);
+            }
+
+          // Close the db when the transaction is done
+          tx.oncomplete = function() {
+              //close database
+              db.close();
+          };
+      }
+
+      //displays error on failed connection
+      request.onerror = function(event) {
+        console.error("add error", this.error);
+        displayActionFailure(this.error);
+      };
+    }
+  }
+
+    function addErrorMessage() {
+      $('.message').append('Podana nazwa kategorii już istnieje');
+    }
+
+  </script>
+</body>
+</html>

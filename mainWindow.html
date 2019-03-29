@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dinero</title>
+  <link rel="stylesheet" href="assets/styles/custom.css">
+  <!--  icons  -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <div class="container">
+    <div class="left_sidebar sidebar">
+      <div class="little-title">Koszty</div>
+      <table class="table_striped" id="cost_table">
+      </table>
+    </div>
+    <div class="right_sidebar sidebar">
+      <!-- main sum container -->
+      <div id="start-value-container"></div>
+      <div id="sum_container" class="right_sidebar_element"></div>
+      <!-- end of main sum container -->
+      <!-- category sum table -->
+      <div class="right_sidebar_element">
+        <table id="sum_categories_table" class="large-table table-thin-border">
+          <tr>
+            <th class="category-table-header">KATEGORIA <i class="fa fa-plus"></i></th>
+            <th>SUMA</th> 
+          </tr>
+        </table>
+      </div>
+      <!-- end of category sum table -->
+      <!--counter-->
+      <div class="counter right_sidebar_element"><p id="time_counter"><i class="fa fa-clock-o"></i></p></div>
+      <!--end of counter-->
+      <!--form-->
+      <div class="new_cost right_sidebar_element"><button class="button"><i class="fa fa-plus"></i> Dodaj nowy koszt</button></div>
+      <!--end of form-->
+    </div>
+    <div class="clear_div"></div>
+  </div>
+  <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+  <script>
+
+    //define jquery
+    let $ = window.$ = require('jquery');
+
+    let lp = 0;
+
+    //define ipcRenderer
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+
+
+
+//create costs table
+
+    //add data new table row
+    function addEntry(cost) {
+       if(cost.value.isActive == 1) {
+          lp++
+          let updateString = "<tr id="+'"'+cost.primaryKey+'"'+" class='cost_table_row'><td>"+lp+'</td><td>'+cost.value.date+"</td><td class='cost_category'>"+cost.value.category+"</td><td class='cost_value'>"+cost.value.cost+'</td></tr>'
+          $('#cost_table').append(updateString)
+       }
+    }
+
+    function loadAndDisplayCosts() {  
+       
+      //create database connection
+      var request = window.indexedDB.open("Database", 3);
+
+      // Create the schema
+      request.onupgradeneeded = function() {
+          var db = request.result;
+          var store = db.createObjectStore("MyObjectStore", {autoIncrement: true});
+          var index = store.createIndex("date", "date");
+      };
+
+      //main operation
+      request.onsuccess = function() {
+        // Start a new transaction
+        var db = request.result;
+        var tx = db.transaction("MyObjectStore", "readwrite");
+        var store = tx.objectStore("MyObjectStore");
+        var index = store.index("date");
+
+        var allData = store.getAll();
+
+        //sends all data to count main sum
+        allData.onsuccess = function(event) {
+          sumCounter(allData.result);
+          createCategoryCostTable(allData.result);
+        }
+        
+        //sort cost by date desc
+        var cursorRequest = store.index('date').openCursor(null, 'prev');
+
+        //get data from database
+        cursorRequest.onsuccess = function(event) {
+          var cursor = event.target.result;
+          if(cursor) {
+            addEntry(cursor);
+            cursor.continue();
+          }
+        }
+
+        // Close the db when the transaction is done
+        tx.oncomplete = function() {
+            db.close();
+        };
+      }
+    }
+
+    loadAndDisplayCosts();
+
+//count main sum
+
+
+      function sumCounter(elements) {
+        var storageSum = parseFloat(localStorage.getItem('mainSum'));
+        var sum =  storageSum == null ? 0 : storageSum;
+
+        if( sum <= 0) {
+          for (var i = 0, len = elements.length; i < len; i++) {
+            var costValue = elements[i].cost;
+            sum += parseFloat(costValue);
+            console.log(sum);
+          }
+        } else {
+          for (var i = 0, len = elements.length; i < len; i++) {
+            var costValue = elements[i].cost;
+            sum -= parseFloat(costValue);
+          }
+
+          showStartValue();
+        }
+
+        var floorSum = Math.round(sum * 100) / 100
+        displayMainSum(floorSum);
+      }
+
+      function showStartValue() {
+        console.log('nana');
+        $('#start-value-container').text('od '+localStorage.getItem('mainSum'));
+      }
+
+      function displayMainSum(sum) {
+        let currency = getCurrency();
+        document.getElementById('sum_container').innerHTML = sum + ' '+ currency;
+      }
+
+      function getCurrency() {
+        var storageCurrency = localStorage.getItem('currency');
+        var currency = storageCurrency == null ? PLN : storageCurrency;
+        return currency;
+      }
+// create category sum table
+
+      function countCategorySum(category, allCosts) {
+        var categorySum = 0;
+
+        for (var i = 0, len = allCosts.length; i < len; i++) {
+          var costValue = parseFloat(allCosts[i].cost);
+          var categoryName = allCosts[i].category;
+
+          if(category == categoryName) {
+            categorySum += costValue;
+          }
+        }
+
+        if(categorySum > 0) {
+          categorySum = Math.round(categorySum * 100) / 100
+          displayCategorySum(category, categorySum);
+        }
+      }
+
+      function displayCategorySum(category, sum) {
+        let currency = getCurrency();
+        let updateString = '<tr><td>'+category+"</td><td class='category_sum'>"+sum+' '+currency+'</td></tr>'
+        $('#sum_categories_table').append(updateString)
+      }
+
+ //database connection
+    function createCategoryCostTable(allCosts) {
+            //create database connection
+      var categoryRequest = window.indexedDB.open("DatabaseForCategory", 3);
+
+      // Create the schema
+      categoryRequest.onupgradeneeded = function() {
+          var db = categoryRequest.result;
+          var store = db.createObjectStore("CategoryStore", {autoIncrement: true});
+          var index = store.createIndex("category", "category");
+      };
+
+
+      //main operation
+      categoryRequest.onsuccess = function() {
+          // Start a new transaction
+          var db = categoryRequest.result;
+          var tx = db.transaction("CategoryStore", "readwrite");
+          var store = tx.objectStore("CategoryStore");
+
+          // Add data to the database
+          store.openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor) {
+              countCategorySum(cursor.value, allCosts);
+              cursor.continue(); 
+            } else {
+              console.log('Entries displayed');
+            }
+          }
+          // Close the db when the transaction is done
+          tx.oncomplete = function() {
+              //close database
+              db.close();
+          };
+      }
+
+      //displays error on failed connection
+      categoryRequest.onerror = function(event) {
+        console.error("add error", this.error);
+        displayActionFailure(this.error);
+      };
+    }
+
+//time counter
+
+var savedDate = localStorage.getItem("date");
+var savedTime = localStorage.getItem("time");
+
+if(savedDate != null || savedTime != null) {
+        //get date
+      date = savedDate+" "+savedTime;
+
+      //set the date
+      var countDownDate = new Date(date).getTime();
+
+      // Update the count down every 1 second
+      var x = setInterval(function() {
+
+          // Get todays date and time
+          var now = new Date().getTime();
+
+          // Find the distance between now an the count down date
+
+          if (now < countDownDate) {
+            var distance = countDownDate - now;
+          } else {
+            var distance = now - countDownDate;
+          }
+          
+
+          // Time calculations for days, hours, minutes and seconds
+          var years = Math.floor(distance / (1000 * 60 * 60 * 24 * 365));
+          var days = Math.floor((distance % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24));
+          var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+          var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+          // Display the result in the element with id="demo"
+          var displayTime = (years > 0 ?  years + "l " : '')+ days + "d " + hours + "h "
+              + minutes + "m " + seconds + "s ";
+          document.getElementById("time_counter").innerHTML = displayTime;
+
+      }, 1000);
+};
+
+
+//create new addWindow on click at button
+      document.querySelector(".new_cost").addEventListener('click', submitForm);
+
+//adds action for clicking on cost table row
+      $('#cost_table').on('click', 'tr', function() {
+        ipcRenderer.send('edit_cost');
+        localStorage.setItem('edit_cost', this.id);
+      });
+
+      // send click on main sum - opens adding window
+      $('#sum_container').click(function() {
+        ipcRenderer.send('add_new_main_sum');
+      });
+
+      // send click on th category table - opens adding window
+      $('#sum_categories_table').on('click', 'i', function() {
+        ipcRenderer.send('add_category');
+      });
+
+      // timer click action
+      $('#time_counter').click(function() {
+        ipcRenderer.send('set_timer');
+      });
+
+      function submitForm(e) {
+          e.preventDefault();
+          ipcRenderer.send('add_new_cost', true);
+      }
+
+  </script>
+</body>
+</html>

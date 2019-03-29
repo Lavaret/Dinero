@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <title>Ustaw czasomierz</title>
+  <link rel="stylesheet" href="assets/styles/formStyle.css">
+  <link rel="stylesheet" href="assets/styles/custom.css">
+</head>
+<body>
+  <div class="container gray_background form_container">
+    <form>
+      <div class="row">
+        <input type="date" id="date" name="date">
+      </div>
+      <div class="row">
+        <input type="time" id="time" name="time" value="00:00">
+      </div>
+      <div class="row">
+          <button type="submit" id="set_date">Zapisz</button>
+      </div>
+    </form>
+  </div>
+  <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+  <script>
+    let $ = window.$ = require('jquery');
+
+    //sending data to main.js constants
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+
+    $('#set_date').on('click', () => {
+       let date = $('#date').val();
+       let time = $('#time').val();
+
+       localStorage.setItem("date", date);
+       localStorage.setItem("time", time);
+    })
+
+    //sends data to main.js
+    document.querySelector('form').addEventListener('submit', submitForm);
+
+    function submitForm(e){
+      e.preventDefault();
+      value = true
+      ipcRenderer.send('submitForm', value);
+    }
+
+  </script>
+</body>
+</html>

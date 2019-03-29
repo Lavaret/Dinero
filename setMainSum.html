@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <title>Ustaw kwotę początkową</title>
+  <link rel="stylesheet" href="assets/styles/formStyle.css">
+  <link rel="stylesheet" href="assets/styles/custom.css">
+</head>
+<body>
+  <div class="container gray_background form_container">
+    <form>
+      <div class="row">
+        <input type="number" id="main-sum-input" step="0.01" name="mainSum" placeholder="Kwota" required="required">
+      </div>
+      <div class="row">
+        <input type="text" id="currency" name="currency" placeholder="Waluta" required="required">
+      </div>
+      <div class="row">
+          <button type="submit" id="set_main_sum">Zapisz</button>
+      </div>
+    </form>
+  </div>
+  <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+  <script>
+    let $ = window.$ = require('jquery');
+
+    //sending data to main.js constants
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+
+    var storageSum = localStorage.getItem('mainSum');
+    var storageCurrency = localStorage.getItem('currency');
+
+    //set default values if they are defined
+    if (storageCurrency != null && storageSum != null) {
+      setDefaultValues();
+    }
+
+    function setDefaultValues() {
+      $('#main-sum-input').val(storageSum);
+      $('#currency').val(storageCurrency);
+    }
+
+    $('#set_main_sum').on('click', () => {
+       let mainSum = $('#main-sum-input').val();
+       let currency = $('#currency').val();
+       localStorage.setItem("mainSum", mainSum);
+       localStorage.setItem("currency", currency);
+    })
+
+    //sends data to main.js
+    document.querySelector('form').addEventListener('submit', submitForm);
+
+    function submitForm(e){
+      e.preventDefault();
+      value = true
+      ipcRenderer.send('submitForm', value);
+    }
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Edycja kosztu</title>
+  <link rel="stylesheet" href="assets/styles/formStyle.css">
+  <link rel="stylesheet" href="assets/styles/custom.css">
+</head>
+<body>
+  <div class="container gray_background form_container">
+    <div class="info_message"></div>
+    <form>
+      <div class="row">
+        <input type="date" id="cost_date" name="date">
+      </div>
+      <div class="row">
+          <select id="category">
+          </select>
+      </div>
+      <div class="row">
+          <input type="number" name="value" id="cost_value" placeholder="Kwota" required="required">
+      </div>
+      <div class="row button_row">
+          <button class="left_button" type="save" id="save_cost">Zapisz</button>
+          <button class="right_button" type="delete" id="delete_cost">Usuń</button>
+          <div class="clear_div"></div>
+      </div>
+    </form>
+  </div>
+  <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+  <script>
+  let $ = window.$ = require('jquery');
+  const electron_data = require('electron-data');
+
+  //sending data to main.js constants
+  const electron = require('electron');
+  const {ipcRenderer} = electron;
+
+  //create database connection
+  var request = window.indexedDB.open("Database", 3);
+  // Create the database schema
+  request.onupgradeneeded = function() {
+      var db = request.result;
+      var store = db.createObjectStore("MyObjectStore", {autoIncrement: true});
+      var index = store.createIndex("date", "category");
+  };
+
+  loadAndDisplayCategories();
+
+  //get key from local storage
+  var editCostId = parseInt(localStorage.getItem('edit_cost'));
+  //displayDataByIndex(editCostId);
+
+var saveButton = $('#save_cost');
+var deleteButton = $('#delete_cost');
+
+saveButton.on('click', function() {
+  updateData();
+});
+
+deleteButton.on('click', function() {
+  deleteData();
+});
+
+//database operation
+function setData(costData) {
+
+  //create database connection
+  var request = window.indexedDB.open("Database", 3);
+  //main operation
+  request.onsuccess = function() {
+      // Start a new transaction
+      var db = request.result;
+      var tx = db.transaction("MyObjectStore", "readwrite");
+      var store = tx.objectStore("MyObjectStore");
+
+      // Add data to the database
+      store.openCursor().onsuccess = function(event) {
+        var cursor = event.target.result;
+        if (cursor) {
+          //check if token record id is equal to edited record
+          if(cursor.key === editCostId) {
+            var saverRequest = cursor.update(costData);
+            saverRequest.onsuccess = function() {
+              console.log('data saved!');
+
+              //send action to the main.js
+              ipcRenderer.send('submitForm', true);
+            }
+
+          }
+          cursor.continue(); 
+        } else {
+          console.log('Entries displayed');
+        }
+      }
+
+      // Close the db when the transaction is done
+      tx.oncomplete = function() {
+          db.close();
+      };
+  }
+
+  //displays error on failed connection
+  request.onerror = function(event) {
+    console.error("add error", this.error);
+    displayActionFailure(this.error);
+  };
+}
+
+//autocomplete form data
+function displayDataByIndex(key) {
+  //create database connection
+  var request = window.indexedDB.open("Database", 3);
+  request.onsuccess = function() {
+    var db = request.result;
+    var tx = db.transaction("MyObjectStore", "readwrite");
+    var store = tx.objectStore("MyObjectStore");
+    var index = store.index("date");
+
+    var getRequest = store.get(key);
+    getRequest.onsuccess = function() {
+      let data = getRequest.result;
+      //put values from database to the form
+      $('#cost_date').val(data.date);
+      console.log($('#category'));
+      $("#category option").filter(function() {
+      return $(this).text() == data.category; 
+        }).attr('selected', true);
+      $('#cost_value').val(data.cost);
+    }
+
+    tx.oncomplete = function() {
+      db.close();
+    };
+  }
+
+    //displays error on failed connection
+  request.onerror = function(event) {
+    console.error("add error", this.error);
+    displayActionFailure(this.error);
+  };
+};
+
+
+//holds update form action
+    function updateData(){
+      //gets data from form 
+      let date = $('#cost_date').val()
+      let category = $('#category option:selected').text();
+      let cost = $('#cost_value').val()
+      let isActive = 1;
+
+      var costData = {'date':date, 'category':category, 'cost':cost, 'isActive':isActive};
+      setData(costData);
+    }
+
+//holds delete form action
+
+    function deleteData() {
+
+      //create database connection
+      var request = window.indexedDB.open("Database", 3);
+
+      //main operation
+      request.onsuccess = function() {
+          // Start a new transaction
+          var db = request.result;
+          var tx = db.transaction("MyObjectStore", "readwrite");
+          var store = tx.objectStore("MyObjectStore");
+
+          //delete data from database
+          var objectStoreRequest = store.delete(editCostId);
+
+          objectStoreRequest.onsuccess = function(event) {
+            // report the success of our request
+            console.log('data removed!');
+          };
+
+          // Close the db when the transaction is done
+          tx.oncomplete = function() {
+              db.close();
+          };
+      }
+
+      //displays error on failed connection
+      request.onerror = function(event) {
+        console.error("add error", this.error);
+        displayActionFailure(this.error);
+      };
+      
+      //send action to the main.js
+      ipcRenderer.send('submitForm', true);
+    }
+
+//add categories to the category select
+    function addEntry(id, name) {
+      let updateString = '<option value="'+id+'">'+name+'</option>';
+      $('#category').append(updateString)
+    }
+
+//database connection
+    function loadAndDisplayCategories() {
+      //create database connection
+      var request = window.indexedDB.open("DatabaseForCategory", 3);
+
+      // Create the schema
+      request.onupgradeneeded = function() {
+          var db = request.result;
+          var store = db.createObjectStore("CategoryStore", {autoIncrement: true});
+          var index = store.createIndex("category", "category");
+      };
+
+      //main operation
+      request.onsuccess = function() {
+          // Start a new transaction
+          var db = request.result;
+          var tx = db.transaction("CategoryStore", "readwrite");
+          var store = tx.objectStore("CategoryStore");
+
+          // Add data to the database
+          store.openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor) {
+              addEntry(cursor.key, cursor.value);
+              cursor.continue(); 
+            } else {
+              console.log('Entries displayed');
+              displayDataByIndex(editCostId);
+            }
+          }
+          // Close the db when the transaction is done
+          tx.oncomplete = function() {
+              //close database
+              db.close();
+          };
+      }
+
+      //displays error on failed connection
+      request.onerror = function(event) {
+        console.error("add error", this.error);
+        displayActionFailure(this.error);
+      };
+    }
+  </script>
+</body>
+</html>

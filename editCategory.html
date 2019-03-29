@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <title>Usuń kategorię</title>
+  <!-- styles -->
+  <link rel="stylesheet" href="assets/styles/formStyle.css">
+  <link rel="stylesheet" href="assets/styles/custom.css">
+  <!--  icons  -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+  <div class="container gray_background form_container">
+    <table id="category_table" class="large-table table-border-bottom">
+      <tr>
+        <th>Nazwa kategorii</th>
+        <th>Akcje</th>
+      </tr>
+    </table>
+  <div class="message-danger message"></div>
+  </div>
+  <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+  <script>
+    let $ = window.$ = require('jquery');
+
+    //sending data to main.js constants
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+
+    displayCategoryTable();
+
+      $('#category_table').on('click', 'td.delete-link', function() {
+        var accepted = confirm("Na pewno chcesz usunąć kategorię?");
+        if(accepted) {
+          deleteData(parseInt(this.id));
+        }
+      });
+
+
+
+
+
+    //add data new table row
+    function addEntry(category) {
+      let updateString = "<tr class='cost_table_row'><td>"+category.value+"</td><td id="+'"'+category.key+'"'+" class='delete-link'><i class='fa fa-trash'></i></td></tr>"
+      $('#category_table').append(updateString)
+    }
+
+
+
+
+    //database connection
+    function displayCategoryTable() {
+      //create database connection
+      var request = window.indexedDB.open("DatabaseForCategory", 3);
+
+      //main operation
+      request.onsuccess = function() {
+          // Start a new transaction
+          var db = request.result;
+          var tx = db.transaction("CategoryStore", "readwrite");
+          var store = tx.objectStore("CategoryStore");
+
+          // Add data to the database
+          store.openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor) {
+              addEntry(cursor);
+              cursor.continue(); 
+            }
+          }
+
+          store.onsuccess = function() {
+            console.log('success');
+          }
+
+          // Close the db when the transaction is done
+          tx.oncomplete = function() {
+              //close database
+              db.close();
+          };
+      }
+
+      //displays error on failed connection
+      request.onerror = function(event) {
+        console.error("add error", this.error);
+        displayActionFailure(this.error);
+      };
+  }
+
+
+
+
+
+  //holds delete form action
+
+    function deleteData(id) {
+      //create database connection
+      var request = window.indexedDB.open("DatabaseForCategory", 3);
+console.log(id);
+      //main operation
+      request.onsuccess = function() {
+          // Start a new transaction
+          var db = request.result;
+          var tx = db.transaction("CategoryStore", "readwrite");
+          var store = tx.objectStore("CategoryStore");
+console.log(id);
+          //delete data from database
+          var objectStoreRequest = store.delete(id);
+
+          objectStoreRequest.onsuccess = function(event) {
+            // report the success of our request
+            console.log('data removed!');
+          };
+
+          store.onsuccess = function() {
+            console.log('success');
+          }
+
+          // Close the db when the transaction is done
+          tx.oncomplete = function() {
+              //close database
+              db.close();
+              //refresh page
+              location.reload();
+          };
+      }
+
+      //displays error on failed connection
+      request.onerror = function(event) {
+        console.error("add error", this.error);
+        displayActionFailure(this.error);
+      };
+    }
+
+
+
+
+
+//add categories to the category select
+    function addOption(id, name) {
+      let updateString = '<option value="'+id+'">'+name+'</option>';
+      $('#category').append(updateString)
+    }
+
+
+
+
+
+
+    function addErrorMessage() {
+      $('.message').append('Podana nazwa kategorii już istnieje');
+    }
+
+  </script>
+</body>
+</html>

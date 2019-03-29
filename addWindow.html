@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Dodaj nowy koszt</title>
+  <link rel="stylesheet" href="assets/styles/formStyle.css">
+  <link rel="stylesheet" href="assets/styles/custom.css">
+</head>
+<body>
+  <div class="container gray_background form_container">
+    <div class="info_message"></div>
+    <form>
+      <div class="row">
+        <input type="date" id="cost_date" name="date">
+      </div>
+      <div class="row">
+          <select id="category">
+          </select>
+      </div>
+      <div class="row">
+          <input type="number" name="value" id="cost_value" placeholder="Kwota" step="0.01" required="required">
+      </div>
+      <div class="row">
+          <button type="submit" id="add_cost">Zapisz</button>
+      </div>
+    </form>
+  </div>
+  <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+  <script>
+    let $ = window.$ = require('jquery');
+    let fs = require('fs')
+    const electron_data = require('electron-data');
+    let filename = 'Data/costs';
+    //sending data to main.js constants
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+
+    //submit form event listener
+    document.querySelector('form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      submitForm();
+    });
+//creates file if it doesn't exist
+    if(!fs.existsSync(filename)) {
+        fs.writeFile(filename, '', (err) => {
+           if(err)
+              console.log(err)
+        })
+     }
+
+//database connection
+function setData(costData) {
+  //create database connection
+  var request = window.indexedDB.open("Database", 3);
+
+  // Create the schema
+  request.onupgradeneeded = function() {
+      var db = request.result;
+      var store = db.createObjectStore("MyObjectStore", {autoIncrement: true});
+      var index = store.createIndex("date", "date");
+  };
+
+  //main operation
+  request.onsuccess = function() {
+      // Start a new transaction
+      var db = request.result;
+      var tx = db.transaction("MyObjectStore", "readwrite");
+      var store = tx.objectStore("MyObjectStore");
+      var index = store.index("date");
+
+      // Add data to the database
+      store.put(costData);
+      store.onsuccess = function() {
+        console.log('success');
+      }
+
+      //add data to the file for backup
+      fs.appendFile(filename, costData.date+","+costData.category+","+costData.cost+'\n');
+
+      // Close the db when the transaction is done
+      tx.oncomplete = function() {
+          db.close();
+          //send action to the main.js
+          ipcRenderer.send('submitForm', true);
+      };
+  }
+
+  //displays error on failed connection
+  request.onerror = function(event) {
+    console.error("add error", this.error);
+    displayActionFailure(this.error);
+  };
+}
+
+//holds submit form action
+    function submitForm(){
+
+      //gets data from form 
+      let date = $('#cost_date').val()
+      let category = $('#category option:selected').text();
+      let cost = $('#cost_value').val()
+      let isActive = 1;
+
+      var costData = {'date':date, 'category':category, 'cost':cost, 'isActive':isActive};
+      setData(costData);
+    }
+
+//sets default present date to the date input
+    Date.prototype.toDateInputValue = (function() {
+        var local = new Date(this);
+        local.setMinutes(this.getMinutes() - this.getTimezoneOffset());
+        return local.toJSON().slice(0,10);
+    });
+
+    document.getElementById('cost_date').value = new Date().toDateInputValue();
+
+//add categories to the category select
+    let lp = 0;
+    let filenameCategory = 'Data/category';
+    //add data
+    function addEntry(id, name) {
+      let updateString = '<option value="'+id+'">'+name+'</option>';
+      $('#category').append(updateString)
+    }
+
+ //database connection
+    function loadAndDisplayCategories() {
+      //create database connection
+      var request = window.indexedDB.open("DatabaseForCategory", 3);
+
+      // Create the schema
+      request.onupgradeneeded = function() {
+          var db = request.result;
+          var store = db.createObjectStore("CategoryStore", {autoIncrement: true});
+          var index = store.createIndex("category", "category");
+      };
+
+      //main operation
+      request.onsuccess = function() {
+          // Start a new transaction
+          var db = request.result;
+          var tx = db.transaction("CategoryStore", "readwrite");
+          var store = tx.objectStore("CategoryStore");
+
+          // Add data to the database
+          store.openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor) {
+              addEntry(cursor.key, cursor.value);
+              cursor.continue(); 
+            } else {
+              console.log('Entries displayed');
+            }
+          }
+          // Close the db when the transaction is done
+          tx.oncomplete = function() {
+              //close database
+              db.close();
+          };
+      }
+
+      //displays error on failed connection
+      request.onerror = function(event) {
+        console.error("add error", this.error);
+        displayActionFailure(this.error);
+      };
+    }
+
+    loadAndDisplayCategories();
+  </script>
+</body>
+</html>

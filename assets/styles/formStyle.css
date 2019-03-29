@@ -1,0 +1,75 @@
+input, button, select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+
+label {
+    padding: 12px 12px 6px 0;
+    display: inline-block;
+    font-size: 16px;
+}
+
+button {
+    background-color: #3F3250;
+    color: white;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+}
+
+button:hover {
+    background-color: #50445F;
+}
+
+button[type=submit] {
+    background-color: #3F3250;
+}
+
+button[type=submit]:hover {
+    background-color: #50445F;
+}
+
+button[type=delete] {
+    background-color: #B93A49;
+}
+
+button[type=delete]:hover {
+    background-color: #E14658;
+}
+
+.form_container {
+	padding: 5%;
+}
+
+.gray_background {
+    background: linear-gradient(#DCD5CB, #D6CEC2);
+}
+
+.row {
+    padding: 20px;
+}
+
+/* Clear floats after the columns */
+.row:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+
+
+.left_button {
+    float: left;
+    margin-right: 5%;
+    width: 45%
+}
+
+.right_button {
+    float: left;
+    margin-left: 5%;
+    width: 45%
+}
